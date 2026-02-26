@@ -1,4 +1,4 @@
-name: NPM (Vite) - Build Dist Zip
+name: Node.js CI (Build dist artifact)
 
 on:
   push:
@@ -10,31 +10,46 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x, 22.x]
+
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: ${{ matrix.node-version }}
           cache: "npm"
 
-      - name: Install
-        run: npm ci || npm install
+      - name: Install deps
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
 
       - name: Build
         run: npm run build
 
       - name: Zip dist
         run: |
-          if [ ! -d "dist" ]; then
-            echo "dist folder not found"
+          if [ -d dist ]; then
+            zip -r dist.zip dist
+          elif [ -d build ]; then
+            zip -r dist.zip build
+          else
+            echo "No dist/ or build/ folder found after build."
+            ls -la
             exit 1
           fi
-          zip -r dist.zip dist
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: dist-zip
+          name: dist-zip-node-${{ matrix.node-version }}
           path: dist.zip
           if-no-files-found: error
